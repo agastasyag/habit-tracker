@@ -6,27 +6,157 @@
     <title>Habit Tracker</title>
     <link rel="manifest" href="/static/manifest.json">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f4f4f5; margin: 0; }
-        h1 { font-size: 24px; font-weight: bold; }
-        .habit-item { display: flex; align-items: center; background: white; padding: 15px; margin-bottom: 10px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .habit-item input[type="checkbox"] { width: 24px; height: 24px; margin-right: 15px; border-radius: 6px; }
-        .habit-title { font-size: 18px; }
-        .done { text-decoration: line-through; color: #a1a1aa; }
+        /* Modern aesthetic reset */
+        * { box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: linear-gradient(135deg, #f6f8fb 0%, #e5ebf0 100%);
+            color: #1d1d1f;
+            margin: 0; 
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Locks the app to a phone-sized width even if opened on your laptop */
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            padding: 40px 24px;
+        }
+
+        h1 { 
+            font-size: 32px; 
+            font-weight: 800; 
+            letter-spacing: -0.5px;
+            margin-bottom: 24px;
+            color: #000;
+        }
+
+        /* Sleek Input Box */
+        .add-container { 
+            display: flex; 
+            gap: 12px; 
+            margin-bottom: 30px; 
+        }
+        
+        .add-container input { 
+            flex: 1; 
+            padding: 16px; 
+            border-radius: 16px; 
+            border: none; 
+            background: #ffffff;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+            font-size: 16px; 
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .add-container input:focus {
+            box-shadow: 0 6px 20px rgba(0, 122, 255, 0.15);
+        }
+
+        .add-container button { 
+            padding: 0 24px; 
+            border-radius: 16px; 
+            background: #007aff; /* Classic iOS Blue */
+            color: #fff; 
+            border: none; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);
+            transition: transform 0.1s ease, background 0.3s ease;
+        }
+
+        .add-container button:active {
+            transform: scale(0.96);
+            background: #005bb5;
+        }
+
+        /* Floating, glass-like habit cards */
+        .habit-item { 
+            display: flex; 
+            align-items: center; 
+            background: rgba(255, 255, 255, 0.7); 
+            backdrop-filter: blur(10px);
+            padding: 18px 20px; 
+            margin-bottom: 12px; 
+            border-radius: 16px; 
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.03); 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Modern accent-colored checkbox */
+        .habit-item input[type="checkbox"] { 
+            width: 26px; 
+            height: 26px; 
+            margin-right: 18px; 
+            accent-color: #007aff;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .habit-item input[type="checkbox"]:active {
+            transform: scale(0.85);
+        }
+
+        .habit-title { 
+            font-size: 18px; 
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        /* Smooth animation when checked off */
+        .habit-item.completed {
+            background: rgba(255, 255, 255, 0.4);
+            box-shadow: none;
+            opacity: 0.6;
+        }
+
+        .habit-item.completed .habit-title {
+            text-decoration: line-through; 
+            color: #8e8e93; 
+        }
     </style>
 </head>
 <body>
 
-    <h1>Today's Habits</h1>
-    <div id="habit-list"></div>
+    <div class="app-container">
+        <h1>Today</h1>
+        
+        <div class="add-container">
+            <input type="text" id="new-habit" placeholder="What do you want to achieve?">
+            <button onclick="addHabit()">Add</button>
+        </div>
+
+        <div id="habit-list"></div>
+    </div>
 
     <script>
-        // 1. Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/static/sw.js');
         }
 
-        // 2. Dynamically set the API URL based on where the app is hosted
         const API_URL = window.location.origin;
+
+        async function addHabit() {
+            const input = document.getElementById('new-habit');
+            const title = input.value.trim();
+            if (!title) return; 
+
+            await fetch(`${API_URL}/api/habits`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title })
+            });
+            
+            input.value = ''; 
+            loadHabits(); 
+        }
 
         async function loadHabits() {
             const response = await fetch(`${API_URL}/api/today`);
@@ -37,16 +167,21 @@
             
             logs.forEach(log => {
                 const div = document.createElement('div');
-                div.className = 'habit-item';
+                // Add the 'completed' class right away if the status is true
+                div.className = `habit-item ${log.status ? 'completed' : ''}`;
                 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = log.status;
-                checkbox.onchange = () => toggleHabit(log.log_id, div.querySelector('.habit-title'));
                 
                 const title = document.createElement('span');
-                title.className = `habit-title ${log.status ? 'done' : ''}`;
+                title.className = 'habit-title';
                 title.innerText = log.title;
+
+                // Toggle animation logic
+                checkbox.onchange = () => {
+                    toggleHabit(log.log_id, div);
+                };
                 
                 div.appendChild(checkbox);
                 div.appendChild(title);
@@ -54,12 +189,14 @@
             });
         }
 
-        async function toggleHabit(logId, titleElement) {
+        async function toggleHabit(logId, divElement) {
+            // Instantly trigger the animation for immediate visual feedback
+            divElement.classList.toggle('completed');
+            
+            // Send the update to the server in the background
             await fetch(`${API_URL}/api/toggle/${logId}`, { method: 'PUT' });
-            titleElement.classList.toggle('done');
         }
 
-        // Load initially
         loadHabits();
     </script>
 </body>
